@@ -6,6 +6,7 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h" // Include this for timers
+#include "Components/WidgetComponent.h"
 
 
 
@@ -28,6 +29,11 @@ AOriginCharacter::AOriginCharacter()
 	GetCharacterMovement()->bOrientRotationToMovement = true;
 	bUseControllerRotationYaw = false;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
+
+	OverheadWidger = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget"));
+	OverheadWidger->SetupAttachment(RootComponent);
+
+
 }
 
 
@@ -108,3 +114,36 @@ void AOriginCharacter::Tick(float DeltaTime)
 // Called to bind functionality to input
 
 
+void AOriginCharacter::SwitchWeapon(int32 WeaponIndex)
+{
+	// Check if the weapon index is valid
+	if (WeaponIndex >= 0 && WeaponIndex < WeaponClasses.Num())
+	{
+		// Destroy current weapon
+		for (AWeapon* Weapon : Weapons)
+		{
+			if (Weapon)
+			{
+				Weapon->Destroy();
+			}
+		}
+		Weapons.Empty();
+
+		// Spawn and attach new weapon
+		AWeapon* NewWeapon = GetWorld()->SpawnActor<AWeapon>(WeaponClasses[WeaponIndex], FVector::ZeroVector, FRotator::ZeroRotator);
+		if (NewWeapon)
+		{
+			AttachWeaponToSocket(NewWeapon);
+			Weapons.Add(NewWeapon);
+		}
+	}
+}
+
+void AOriginCharacter::AttachWeaponToSocket(AWeapon* Weapon)
+{
+	if (Weapon && GetMesh())
+	{
+		USkeletalMeshComponent* MeshComp = GetMesh();
+		Weapon->AttachToComponent(MeshComp, FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponSocketName);
+	}
+}

@@ -6,7 +6,11 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "../Project_Taco/Weapon/Weapon.h" 
+#include "Components/SkeletalMeshComponent.h"
 #include "OriginCharacter.generated.h"
+
+
 
 UCLASS()
 class PROJECT_TACO_API AOriginCharacter : public ACharacter
@@ -31,17 +35,29 @@ protected:
 	void MoveRight(float Value);
 	void Turn(float Value);
 	void LookUp(float Value);
+	void AttachWeaponToSocket(AWeapon* Weapon);
+
+	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
+	TArray<TSubclassOf<AWeapon>> WeaponClasses;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Weapon")
+	TArray<AWeapon*> Weapons;
+
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Weapon")
+	FName WeaponSocketName;
 private:
 	UPROPERTY(VisibleAnywhere, Category = Camera)
 	class USpringArmComponent* CameraBoom;
 
 	UPROPERTY(VisibleAnywhere, Category = Camera)
 	class UCameraComponent* FollowCamera;
-	// Declare a variable to track whether the character is running.
+
 	UPROPERTY(VisibleAnywhere)
 	bool bDoublePressW;
 
-
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, meta = (AllowPrivateAccess = "true"))
+	class UWidgetComponent* OverheadWidger;
 public:
-
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	void SwitchWeapon(int32 WeaponIndex);
 };

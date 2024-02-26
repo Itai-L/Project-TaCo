@@ -25,6 +25,17 @@ void UOriginAnimInstance::NativeUpdateAnimation(float DeltaTime)
 	Velocity.Z = 0.f;
 	Speed = Velocity.Size();
 
+	if (Speed < 0.0f)
+	{
+		// Speed is negative, meaning the character is moving backwards
+		bIsMovingBackwards = true;
+	}
+	else
+	{
+		// Speed is non-negative, meaning the character is not moving backwards
+		bIsMovingBackwards = false;
+	}
+
 	bIsInAir = OriginCharacter->GetCharacterMovement()->IsFalling();
 	bIsAccelerating = OriginCharacter->GetCharacterMovement()->GetCurrentAcceleration().Size() > 0.f ? true : false;
 }
