@@ -38,4 +38,8 @@ void UOriginAnimInstance::NativeUpdateAnimation(float DeltaTime)
 
 	bIsInAir = OriginCharacter->GetCharacterMovement()->IsFalling();
 	bIsAccelerating = OriginCharacter->GetCharacterMovement()->GetCurrentAcceleration().Size() > 0.f ? true : false;
+	bAiming= OriginCharacter->isAiming();
+	bScanStance = OriginCharacter->isScanStance();
+	bGeneralStance = OriginCharacter->isGeneralStance();
+	bCloseQuarters = OriginCharacter->isCloseQuarters();
 }

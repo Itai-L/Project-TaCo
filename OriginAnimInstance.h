@@ -33,5 +33,17 @@ private:
 
 	UPROPERTY(BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
 	bool bIsMovingBackwards;
+
+	UPROPERTY(BlueprintReadOnly, Category = Shooting, meta = (AllowPrivateAccess = "true"))
+	bool bAiming;
+	UPROPERTY(BlueprintReadOnly, Category = Stance, meta = (AllowPrivateAccess = "true"))
+	bool bGeneralStance;
+	UPROPERTY(BlueprintReadOnly, Category = Stance, meta = (AllowPrivateAccess = "true"))
+	bool bScanStance;
+	UPROPERTY(BlueprintReadOnly, Category = Stance, meta = (AllowPrivateAccess = "true"))
+	bool bCloseQuarters;
+
+
+	
 };
 
