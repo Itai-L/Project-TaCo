@@ -47,7 +47,9 @@ protected:
 	void LeftShiftReleased();
 	void OneKeyPressed();
 	void TwoKeyPressed();
-
+	void CrouchPressed();
+	void PronePressed();
+	void ManageCrouchProne();
 	// Override GetLifetimeReplicatedProps to replicate bAiming
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -106,6 +108,12 @@ public:
 	float PreviousSpeed;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement", Replicated)
 	int32 CurrentWeaponIndex;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement", Replicated)
+	bool Crouched;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement", Replicated)
+	bool bInProne;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement", Replicated)
+	bool bProneState;
 
 
 
@@ -145,4 +153,8 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerSwitchWeapon(int32 WeaponIndex);
 
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerPronePressed();
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerCrouchPressed();
 };

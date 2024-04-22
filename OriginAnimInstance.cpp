@@ -42,4 +42,6 @@ void UOriginAnimInstance::NativeUpdateAnimation(float DeltaTime)
 	bScanStance = OriginCharacter->isScanStance();
 	bGeneralStance = OriginCharacter->isGeneralStance();
 	bCloseQuarters = OriginCharacter->isCloseQuarters();
+	bIsCrouched = OriginCharacter->bIsCrouched;
+	bInProne = OriginCharacter->bInProne;
 }
