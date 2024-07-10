@@ -2,12 +2,17 @@
 
 
 #include "OriginCharacter.h"
+#include "Components/CapsuleComponent.h"
 #include "Weapon/Weapon.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "TimerManager.h" // Include this for timers
+#include "Kismet/KismetMathLibrary.h"
+#include "Net/UnrealNetwork.h" // Included for replication
 #include "Components/WidgetComponent.h"
+#include "OriginAnimInstance.h"
+#include "Components/SkeletalMeshComponent.h"
 
 
 AOriginCharacter::AOriginCharacter()
@@ -15,44 +20,49 @@ AOriginCharacter::AOriginCharacter()
 	// Set this character to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
 	PrimaryActorTick.bCanEverTick = true;
 
-	// CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
-	// CameraBoom->SetupAttachment(GetMesh());
-	// CameraBoom->TargetArmLength = 600.f;
-	// CameraBoom->bUsePawnControlRotation = true;
+	//CameraBoom = CreateDefaultSubobject<USpringArmComponent>(TEXT("CameraBoom"));
+	//CameraBoom->SetupAttachment(GetMesh());
+	//CameraBoom->TargetArmLength = 300.f;
+	//CameraBoom->bUsePawnControlRotation = true;
 
 	//FollowCamera = CreateDefaultSubobject<UCameraComponent>(TEXT("FollowCamera"));
-	////FollowCamera->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, "head");
-	// FollowCamera->AttachToComponent(GetMesh(), FAttachmentTransformRules::SnapToTargetIncludingScale, TEXT("head"));
 	//FollowCamera->SetupAttachment(CameraBoom, USpringArmComponent::SocketName);
 	//FollowCamera->bUsePawnControlRotation = false;
 
-	// Assuming this code is within the constructor of your character class
-
-// Assuming this code is within the constructor of your character class
-
-/// Create the follow camera
-	
-
-
-
-
-	//UseControllerRotationYaw = false;
+	bUseControllerRotationYaw = true;
 	GetCharacterMovement()->bOrientRotationToMovement = true;
-	bUseControllerRotationYaw = false;
-	GetCharacterMovement()->bOrientRotationToMovement = true;
+
+
 
 	OverheadWidger = CreateDefaultSubobject<UWidgetComponent>(TEXT("OverheadWidget"));
 	OverheadWidger->SetupAttachment(RootComponent);
 	GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
-	;
+	
+	//GetCharacterMovement()->NavAgentProps.bCanCrouch = true;
+	/*GetCapsuleComponent()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
+	GetMesh()->SetCollisionObjectType(ECC_SkeletalMesh);
+	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Camera, ECollisionResponse::ECR_Ignore);
+	GetMesh()->SetCollisionResponseToChannel(ECollisionChannel::ECC_Visibility, ECollisionResponse::ECR_Block);
+	GetCharacterMovement()->RotationRate = FRotator(0.f, 0.f, 850.f);*/
 
+	TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+	NetUpdateFrequency = 66.f;
+	MinNetUpdateFrequency = 33.f;
+	CurrentWeaponIndex = 0;
+	bReplicates = true;
 }
 
 // Called when the game starts or when spawned
 void AOriginCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+	//AttachCameraToHead();
+	if (HasAuthority()) // Ensure this is only run on the server
+	{
+		CurrentWeaponIndex = -1;
+	}
 
+	SwitchWeapon(0);
 }
 
 void AOriginCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
@@ -65,6 +75,8 @@ void AOriginCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	PlayerInputComponent->BindAxis("LookUp", this, &AOriginCharacter::LookUp);
 	PlayerInputComponent->BindAction("RightMouseButton", IE_Pressed, this, &AOriginCharacter::OnRightMousePressed);
 	PlayerInputComponent->BindAction("RightMouseButton", IE_Released, this, &AOriginCharacter::OnRightMouseReleased);
+	PlayerInputComponent->BindAction("Fire", IE_Pressed, this, &AOriginCharacter::FireButtonPressed);
+	PlayerInputComponent->BindAction("Fire", IE_Released, this, &AOriginCharacter::FireButtonReleased);
 	PlayerInputComponent->BindAction("LeftCtrl", IE_Pressed, this, &AOriginCharacter::LeftCtrlPressed);
 	PlayerInputComponent->BindAction("Wkey", IE_Pressed, this, &AOriginCharacter::WisPressed);
 	PlayerInputComponent->BindAction("Wkey", IE_Released, this, &AOriginCharacter::WisReleased);
@@ -75,6 +87,25 @@ void AOriginCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 	PlayerInputComponent->BindAction("Crouch", IE_Released, this, &AOriginCharacter::CrouchPressed);
 	PlayerInputComponent->BindAction("Prone", IE_Released, this, &AOriginCharacter::PronePressed);
 
+}
+
+
+
+
+
+void AOriginCharacter::AttachCameraToHead()
+{
+	USkeletalMeshComponent* MeshComp = GetMesh();
+	if (MeshComp)
+	{
+		CameraComponent->SetupAttachment(MeshComp);
+
+		UE_LOG(LogTemp, Log, TEXT("Camera attached to head socket"));
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Mesh component not found"));
+	}
 }
 
 void AOriginCharacter::MoveForward(float Value)
@@ -112,6 +143,39 @@ void AOriginCharacter::MoveRight(float Value)
 void AOriginCharacter::Turn(float Value)
 {
 	AddControllerYawInput(Value);
+
+
+
+}
+
+void AOriginCharacter::AdjustCharacterMovement(float DeltaYaw)
+{
+	
+
+	if (DeltaYaw > 90.0f)
+	{
+		
+		GetCharacterMovement()->bUseControllerDesiredRotation = true;
+		GetCharacterMovement()->bOrientRotationToMovement = false;
+		bTurnRight = true;
+		bTurnLeft = false;
+	}
+	else if (DeltaYaw < -90.0f)
+	{
+	
+		GetCharacterMovement()->bUseControllerDesiredRotation = true;
+		GetCharacterMovement()->bOrientRotationToMovement = false;
+		bTurnRight = false;
+		bTurnLeft = true;
+	}
+	else
+	{
+		
+		GetCharacterMovement()->bUseControllerDesiredRotation = false;
+		GetCharacterMovement()->bOrientRotationToMovement = true;
+		bTurnRight = false;
+		bTurnLeft = false;
+	}
 }
 
 void AOriginCharacter::LookUp(float Value)
@@ -122,7 +186,7 @@ void AOriginCharacter::LookUp(float Value)
 void AOriginCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
+	AimOffset(DeltaTime);
 }
 
 void AOriginCharacter::ResetPressCount()
@@ -136,10 +200,21 @@ void AOriginCharacter::SwitchWeapon(int32 WeaponIndex)
 {
 	if (HasAuthority())
 	{
-		// Check if the weapon index is valid
+		UE_LOG(LogTemp, Log, TEXT("Available Weapon Classes:"));
+		for (int32 i = 0; i < WeaponClasses.Num(); ++i)
+		{
+			if (WeaponClasses[i])
+			{
+				UE_LOG(LogTemp, Log, TEXT("Weapon %d: %s"), i, *WeaponClasses[i]->GetName());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Log, TEXT("Weapon %d: None"), i);
+			}
+		}
+
 		if (WeaponIndex >= 0 && WeaponIndex < WeaponClasses.Num())
 		{
-			// Destroy current weapon
 			for (AWeapon* Weapon : Weapons)
 			{
 				if (Weapon)
@@ -149,21 +224,53 @@ void AOriginCharacter::SwitchWeapon(int32 WeaponIndex)
 			}
 			Weapons.Empty();
 
-			// Spawn and attach new weapon
-			AWeapon* NewWeapon = GetWorld()->SpawnActor<AWeapon>(WeaponClasses[WeaponIndex], FVector::ZeroVector, FRotator::ZeroRotator);
+			FActorSpawnParameters SpawnParams;
+			SpawnParams.Owner = this;
+			SpawnParams.Instigator = GetInstigator();
+			AWeapon* NewWeapon = GetWorld()->SpawnActor<AWeapon>(WeaponClasses[WeaponIndex], FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
 			if (NewWeapon)
 			{
 				AttachWeaponToSocket(NewWeapon);
 				Weapons.Add(NewWeapon);
+				NewWeapon->SetOwningCharacter(this);
+
+				LeftHandTransform = NewWeapon->GetWeaponMesh()->GetSocketTransform(FName("LeftHandSocket"), ERelativeTransformSpace::RTS_World);
+				FVector OutPosition;
+				FRotator OutRotation;
+				GetMesh()->TransformToBoneSpace(FName("hand_r"), LeftHandTransform.GetLocation(), FRotator::ZeroRotator, OutPosition, OutRotation);
+				LeftHandTransform.SetLocation(OutPosition);
+				LeftHandTransform.SetRotation(FQuat(OutRotation));
+
+				CurrentWeaponIndex = WeaponIndex;
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("Failed to spawn weapon at index %d"), WeaponIndex);
 			}
 		}
-
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Invalid weapon index %d"), WeaponIndex);
+		}
 	}
-	else if (GetLocalRole() < ROLE_Authority)
+	else
 	{
 		ServerSwitchWeapon(WeaponIndex);
 	}
 }
+
+
+
+FTransform AOriginCharacter::getLeftHandTransform() {
+
+	return LeftHandTransform;
+}
+
+
+//void AOriginCharacter::setAO_Yaw(float Yaw) {
+//
+//	AO_Yaw = Yaw;
+//}
 
 bool AOriginCharacter::isAiming()
 {
@@ -192,6 +299,7 @@ void AOriginCharacter::AttachWeaponToSocket(AWeapon* Weapon)
 	{
 		USkeletalMeshComponent* MeshComp = GetMesh();
 		Weapon->AttachToComponent(MeshComp, FAttachmentTransformRules::SnapToTargetIncludingScale, WeaponSocketName);
+
 	}
 }
 
@@ -209,11 +317,9 @@ void AOriginCharacter::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out
 	DOREPLIFETIME(AOriginCharacter, PreviousSpeed);
 	DOREPLIFETIME(AOriginCharacter, CurrentWeaponIndex);
 	DOREPLIFETIME(AOriginCharacter, bInProne);
-	
-
-
-
+	DOREPLIFETIME(AOriginCharacter, Weapons);
 }
+	
 
 
 void AOriginCharacter::OnRightMousePressed()
@@ -249,7 +355,6 @@ bool AOriginCharacter::ServerOnRightMousePressed_Validate()
 	return true;
 }
 
-
 void AOriginCharacter::OnRightMouseReleased()
 {
 	if (HasAuthority())
@@ -265,6 +370,40 @@ void AOriginCharacter::OnRightMouseReleased()
 	}
 }
 
+//void AOriginCharacter::FireButtonPressed()
+//{
+//	bFiring = true;
+//	PlayFireMontage();
+//	ServerFire();
+//	
+//}
+//void AOriginCharacter::FireButtonReleased()
+//{
+//	
+//	bFiring = false;
+//}
+//
+//void AOriginCharacter::ServerFire_Implementation()
+//{
+//	MulticastFire();
+//}
+//
+//void AOriginCharacter::MulticastFire_Implementation()
+//{
+//	
+//	PlayFireMontage();
+//
+//}
+//
+//void AOriginCharacter::PlayFireMontage()
+//{
+//	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+//
+//	AnimInstance->Montage_Play(FireWeaponMontage);
+//	Weapons[CurrentWeaponIndex]->Fire();
+//
+//
+//}
 void AOriginCharacter::ServerOnRightMouseReleased_Implementation()
 {
 	bAiming = false;
@@ -274,7 +413,6 @@ bool AOriginCharacter::ServerOnRightMouseReleased_Validate()
 {
 	return true;
 }
-
 
 void AOriginCharacter::LeftCtrlPressed()
 {
@@ -369,7 +507,6 @@ bool AOriginCharacter::ServerLeftCtrlPressed_Validate()
 	return true;
 }
 
-
 void AOriginCharacter::WisPressed()
 {
 	if (HasAuthority())
@@ -454,7 +591,6 @@ bool AOriginCharacter::ServerWisPressed_Validate()
 {
 	return true;
 }
-
 
 void AOriginCharacter::WisReleased()
 {
@@ -608,16 +744,16 @@ bool AOriginCharacter::ServerLeftShiftReleased_Validate()
 	return true;
 }
 
-
-
 void AOriginCharacter::OneKeyPressed()
 {
 	SwitchWeapon(0);
+
 }
 
 void AOriginCharacter::TwoKeyPressed()
 {
 	SwitchWeapon(1);
+
 }
 
 void AOriginCharacter::CrouchPressed()
@@ -652,8 +788,6 @@ void AOriginCharacter::CrouchPressed()
 	
 }
 
-
-
 void AOriginCharacter::ServerCrouchPressed_Implementation()
 {
 	
@@ -687,9 +821,6 @@ bool AOriginCharacter::ServerCrouchPressed_Validate()
 {
 	return true;
 }
-
-
-
 
 void AOriginCharacter::PronePressed()
 {
@@ -738,8 +869,6 @@ void AOriginCharacter::PronePressed()
 	
 }
 
-
-
 void AOriginCharacter::ServerPronePressed_Implementation()
 {
 
@@ -779,9 +908,6 @@ bool AOriginCharacter::ServerPronePressed_Validate()
 	return true;
 }
 
-
-
-
 void AOriginCharacter::ServerSwitchWeapon_Implementation(int32 WeaponIndex)
 {
 	// Weapon switch logic goes here
@@ -793,4 +919,178 @@ bool AOriginCharacter::ServerSwitchWeapon_Validate(int32 WeaponIndex)
 	// Add any validation logic here
 	// For now, we'll just return true to indicate it's always valid
 	return true;
+}
+
+bool AOriginCharacter::getTurnRight() {
+	return bTurnRight;
+}
+
+bool AOriginCharacter::getTurnLeft() {
+	return bTurnLeft;
+}
+
+
+	
+void AOriginCharacter::AimOffset(float DeltaTime)
+{
+	
+	float Speed = CalculateSpeed();
+	bool bIsInAir = GetCharacterMovement()->IsFalling();
+
+	if (Speed == 0.f && !bIsInAir) // standing still, not jumping
+	{
+		bRotateRootBone = true;
+		FRotator CurrentAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
+		FRotator DeltaAimRotation = UKismetMathLibrary::NormalizedDeltaRotator(CurrentAimRotation, StartingAimRotation);
+		AO_Yaw = DeltaAimRotation.Yaw;
+		if (TurningInPlace == ETurningInPlace::ETIP_NotTurning)
+		{
+			InterpAO_Yaw = AO_Yaw;
+		}
+		bUseControllerRotationYaw = true;
+		TurnInPlace(DeltaTime);
+	}
+	if (Speed > 0.f) // running, or jumping
+	{
+		bRotateRootBone = false;
+		StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
+		AO_Yaw = 0.f;
+		bUseControllerRotationYaw = true;
+		TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+	}
+
+	CalculateAO_Pitch();
+}
+
+void AOriginCharacter::CalculateAO_Pitch()
+{
+	AO_Pitch = GetBaseAimRotation().Pitch;
+	if (AO_Pitch > 90.f && !IsLocallyControlled())
+	{
+		// map pitch from [270, 360) to [-90, 0)
+		FVector2D InRange(270.f, 360.f);
+		FVector2D OutRange(-90.f, 0.f);
+		AO_Pitch = FMath::GetMappedRangeValueClamped(InRange, OutRange, AO_Pitch);
+	}
+}
+
+void AOriginCharacter::TurnInPlace(float DeltaTime)
+{
+	if (AO_Yaw > 90.f)
+	{
+		TurningInPlace = ETurningInPlace::ETIP_Right;
+	}
+	else if (AO_Yaw < -90.f)
+	{
+		TurningInPlace = ETurningInPlace::ETIP_Left;
+	}
+
+	if (TurningInPlace != ETurningInPlace::ETIP_NotTurning)
+	{
+		InterpAO_Yaw = FMath::FInterpTo(InterpAO_Yaw, 0.f, DeltaTime, 4.f);
+		AO_Yaw = InterpAO_Yaw;
+		if (FMath::Abs(AO_Yaw) < 15.f)
+		{
+			TurningInPlace = ETurningInPlace::ETIP_NotTurning;
+			StartingAimRotation = FRotator(0.f, GetBaseAimRotation().Yaw, 0.f);
+		}
+	}
+}
+
+float AOriginCharacter::CalculateSpeed()
+{
+	FVector Velocity = GetVelocity();
+	Velocity.Z = 0.f;
+	return Velocity.Size();
+}
+
+void AOriginCharacter::OnRep_Weapons()
+{
+	UE_LOG(LogTemp, Log, TEXT("Weapons array replicated with %d items"), Weapons.Num());
+	for (int32 i = 0; i < Weapons.Num(); ++i)
+	{
+		if (Weapons[i])
+		{
+			UE_LOG(LogTemp, Log, TEXT("Weapon %d: %s"), i, *Weapons[i]->GetName());
+		}
+	}
+}
+
+void AOriginCharacter::FireButtonPressed()
+{
+	bFiring = true;
+	//PlayFireMontage();
+	ServerFire();
+}
+
+void AOriginCharacter::FireButtonReleased()
+{
+	bFiring = false;
+}
+
+void AOriginCharacter::ServerFire_Implementation()
+{
+	MulticastFire();
+}
+
+bool AOriginCharacter::ServerFire_Validate()
+{
+	return true;
+}
+
+void AOriginCharacter::MulticastFire_Implementation()
+{
+	PlayFireMontage();
+}
+
+void AOriginCharacter::PlayFireMontage()
+{
+	UE_LOG(LogTemp, Log, TEXT("PlayFireMontage called"));
+
+	// Log the animation montage and whether it's valid
+	UAnimInstance* AnimInstance = GetMesh()->GetAnimInstance();
+	if (AnimInstance && FireWeaponMontage)
+	{
+		UE_LOG(LogTemp, Log, TEXT("Playing fire weapon montage"));
+		AnimInstance->Montage_Play(FireWeaponMontage);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AnimInstance or FireWeaponMontage is null"));
+	}
+
+	// Log the current weapon index
+	UE_LOG(LogTemp, Log, TEXT("CurrentWeaponIndex: %d"), CurrentWeaponIndex);
+
+	// Log the entire Weapons array
+	UE_LOG(LogTemp, Log, TEXT("Weapons array contains %d elements"), Weapons.Num());
+	for (int32 i = 0; i < Weapons.Num(); ++i)
+	{
+		if (Weapons[i])
+		{
+			UE_LOG(LogTemp, Log, TEXT("Weapon %d: %s"), i, *Weapons[i]->GetName());
+		}
+		else
+		{
+			UE_LOG(LogTemp, Log, TEXT("Weapon %d: None"), i);
+		}
+	}
+
+	// Check if the current weapon index is valid and log the weapon details
+	if (Weapons.IsValidIndex(CurrentWeaponIndex))
+	{
+		if (Weapons[CurrentWeaponIndex])
+		{
+			UE_LOG(LogTemp, Log, TEXT("Firing weapon at index %d: %s"), CurrentWeaponIndex, *Weapons[CurrentWeaponIndex]->GetName());
+			Weapons[CurrentWeaponIndex]->Fire();
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("Current weapon at index %d is null"), CurrentWeaponIndex);
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("Invalid weapon index: %d"), CurrentWeaponIndex);
+	}
 }

@@ -23,9 +23,16 @@ class PROJECT_TACO_API AWeapon : public AActor
 	
 public:	
 	// Sets default values for this actor's properties
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
 	AWeapon();
 	virtual void Tick(float DeltaTime) override;
+	void Fire();
+	UPROPERTY(EditAnywhere, Category = "Weapon Properties")
 
+	class UAnimationAsset* FireAnimation;
+
+	void SetOwningCharacter(ACharacter* NewOwner); // Method declaration
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -41,5 +48,7 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	EWeaponState WeaponState;
 
+	UPROPERTY(Replicated)
+	ACharacter* OwningCharacter;
 
 };

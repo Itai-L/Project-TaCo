@@ -44,4 +44,12 @@ void UOriginAnimInstance::NativeUpdateAnimation(float DeltaTime)
 	bCloseQuarters = OriginCharacter->isCloseQuarters();
 	bIsCrouched = OriginCharacter->bIsCrouched;
 	bInProne = OriginCharacter->bInProne;
+	AO_Yaw = OriginCharacter->GetAO_Yaw();
+	AO_Pitch = OriginCharacter->GetAO_Pitch();
+	LeftHandTransform = OriginCharacter->getLeftHandTransform();
+	bTurnRight = OriginCharacter->getTurnRight();
+	bTurnLeft = OriginCharacter->getTurnLeft();
+	TurningInPlace = OriginCharacter->GetTurningInPlace();
+
+
 }
