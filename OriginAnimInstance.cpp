@@ -50,6 +50,30 @@ void UOriginAnimInstance::NativeUpdateAnimation(float DeltaTime)
 	bTurnRight = OriginCharacter->getTurnRight();
 	bTurnLeft = OriginCharacter->getTurnLeft();
 	TurningInPlace = OriginCharacter->GetTurningInPlace();
+	bElimmed = OriginCharacter->IsElimmed();
+	RecoveryTime = OriginCharacter->GetRecoveryTime();
+	RateScale = CalculateRateScale();
+	bElimmed = OriginCharacter->IsElimmed();
+	bJamsMenu = OriginCharacter->GetJamsMenu();
+
+}
+
+float UOriginAnimInstance::CalculateRateScale()
+{
+	float CurrentRateScale=0.f;
+	if(RecoveryTime>0.f)
+		CurrentRateScale = RecoveryTime / 3;
+
+	if (bIsCrouched && CurrentRateScale > 3)
+		return 2;
+
+	if (CurrentRateScale > 3)
+		return 3;
+
+	return CurrentRateScale;
+
+
 
 
 }
+

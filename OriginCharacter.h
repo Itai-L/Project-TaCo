@@ -10,8 +10,9 @@
 #include "../Project_Taco/TurningInPlace.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Net/UnrealNetwork.h"
-#include "OriginCharacter.generated.h"
 
+#include "OriginCharacter.generated.h"
+#define TRACE_LENGTH 80000.f
 
 UCLASS()
 class PROJECT_TACO_API AOriginCharacter : public ACharacter
@@ -25,6 +26,8 @@ public:
 	AOriginCharacter();
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
+
+	void HandleJamManuInput(int JamResolveInput);
 
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
@@ -49,6 +52,7 @@ protected:
 	void LeftShiftReleased();
 	void OneKeyPressed();
 	void TwoKeyPressed();
+	void ThreeKeyPressed();
 	void CrouchPressed();
 	void PronePressed();
 	void ManageCrouchProne();
@@ -57,12 +61,14 @@ protected:
 	float CalculateSpeed();
 	// Override GetLifetimeReplicatedProps to replicate bAiming
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
-
+	void TraceUnderCrosshairs(FHitResult& TraceHitResult);
 	void AttachWeaponToSocket(AWeapon* Weapon);
+	void RButtonPressed();
+	void RButtonReleased();
 
 	UPROPERTY(EditDefaultsOnly, Category = "Weapon")
 	TArray<TSubclassOf<AWeapon>> WeaponClasses;
-	UPROPERTY(ReplicatedUsing = OnRep_Weapons) // Added replication and OnRep function
+	UPROPERTY(VisibleAnywhere, BlueprintReadWrite,ReplicatedUsing = OnRep_Weapons) // Added replication and OnRep function
 	TArray<AWeapon*> Weapons;
 	
 
@@ -70,7 +76,10 @@ protected:
 	FName WeaponSocketName;
 
 
+
 private:
+	float SecondJamChance = 0.001f; // Start with 0.1% chance
+
 	UPROPERTY(VisibleAnywhere, Category = Camera)
 	class USpringArmComponent* CameraBoom;
 
@@ -87,9 +96,21 @@ private:
     FTimerHandle TimerHandle_ResetPressCount;
 	void ResetPressCount();
 	
+	UPROPERTY(VisibleAnywhere)
+	float SprintingTimeCounter;
+
+	UPROPERTY(VisibleAnywhere)
+	float RunningTimeCounter;
+	UPROPERTY(VisibleAnywhere)
+	float RunningRecoveryTime;
+	UPROPERTY(VisibleAnywhere)
+	float SprintRecoveryTime;
+	UPROPERTY(VisibleAnywhere)
+	float TotalRecoveryTime;
 
 
 public:
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Camera")
 	class UCameraComponent* CameraComponent;
 
@@ -132,6 +153,22 @@ public:
 	float AO_Yaw;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement", Replicated)
 	float AO_Pitch;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jams", Replicated)
+	bool JamsMenu;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jams", Replicated)
+	bool bFirstJam;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jams", Replicated)
+	bool bFirstJamResolve;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jams", Replicated)
+	bool bSecondJam;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jams", Replicated)
+	bool bThirdJam;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jams", Replicated)
+	bool bWaitForJamManuInput;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jams", Replicated)
+	int JamType;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Jams", Replicated)
+	int JamResolveInput;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement", Replicated)
 	FRotator StartingAimRotation;
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement", Replicated)
@@ -146,9 +183,11 @@ public:
 	FTransform LeftHandTransform;
 	UPROPERTY(EditAnywhere, Category = Combat)
 	class UAnimMontage* FireWeaponMontage;
-	
-
-
+	UFUNCTION(BlueprintCallable, Category = "Weapon")
+	USkeletalMeshComponent* GetCurrentWeaponMesh() const;
+	void PlayHitReactMontage();
+	UPROPERTY(EditAnywhere, Category = Combat)
+	UAnimMontage* HitReactMontage;
 	//Getters	
 	UFUNCTION(BlueprintCallable)
 	bool isAiming();
@@ -160,6 +199,16 @@ public:
 	bool isCloseQuarters();
 	FORCEINLINE float GetAO_Yaw() const { return AO_Yaw; }
 	FORCEINLINE float GetAO_Pitch() const { return AO_Pitch; }
+	FORCEINLINE float GetRecoveryTime() const { return TotalRecoveryTime; }
+	FORCEINLINE bool GetJamsMenu() const { return JamsMenu; }
+	FORCEINLINE bool GetFirstJam() const { return bFirstJam; }
+	FORCEINLINE bool GetFirstJamResolve() const { return bFirstJamResolve; }
+	FORCEINLINE bool GetSecondJam() const { return bSecondJam; }
+	FORCEINLINE bool GetThirdJam() const { return bThirdJam; }
+
+
+
+
 	UFUNCTION(BlueprintCallable)
 	FTransform getLeftHandTransform();
 	UFUNCTION(BlueprintCallable)
@@ -167,10 +216,20 @@ public:
 	UFUNCTION(BlueprintCallable)
 	bool getTurnLeft();
 	UFUNCTION(BlueprintCallable)
-	void PlayFireMontage();
+	void PlayFireMontage(const FVector_NetQuantize& TraceHitTarget);
+	UFUNCTION(BlueprintCallable)
+	void Jams();
+	void PlayJamsMontage(FName Section);
+	void PlayElimMontage();
 
+	UFUNCTION(NetMulticast, Reliable)
+	void Elim();
+	UPROPERTY(EditAnywhere, Category = Combat)
+	UAnimMontage* ElimMontage;
+	UPROPERTY(EditAnywhere, Category = Jams)
+	UAnimMontage* JamsMontage;
 
-
+	bool bElimmed = false;
 	UFUNCTION(BlueprintCallable, Category = "Movement")
 	void AdjustCharacterMovement(float DeltaYaw);
 	UFUNCTION(Server, Reliable, WithValidation)
@@ -194,12 +253,62 @@ public:
 	UFUNCTION(Server, Reliable, WithValidation)
 	void ServerCrouchPressed();
 	UFUNCTION(Server, Reliable, WithValidation)
-	void ServerFire();
+	void ServerRButtonPressed();
+	UFUNCTION(Server, Reliable, WithValidation)
+	void ServerRButtonReleased();
+	UFUNCTION(Server, Reliable)
+	void ServerPlayJamsMontage(FName Section);
+	UFUNCTION(Server, Reliable)
+	void ServerFire(const FVector_NetQuantize& TraceHitTarget);
 	UFUNCTION(NetMulticast, Reliable)
-	void MulticastFire();
+	void MulticastFire(const FVector_NetQuantize& TraceHitTarget);
+	UFUNCTION(NetMulticast, Reliable)
+	void MulticastPlayJamsMontage(FName Seection);
 	UFUNCTION()
 	void OnRep_Weapons();
+	UPROPERTY(EditAnywhere, Category = "Player Stats")
+	float MaxHealth = 100.f;
+	UPROPERTY(ReplicatedUsing = OnRep_Health, VisibleAnywhere, Category = "Player Stats")
+	float Health = 100.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fatique")
+	float Fatigue = 0.f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	bool bIsRunning;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Movement")
+	bool bIsSprinting;
 
 
-	FORCEINLINE ETurningInPlace GetTurningInPlace() const { return TurningInPlace; }
+	UFUNCTION()
+	void AdjustSpeed(float InitSpeed);
+	UFUNCTION()
+	void DecreaseRecoveryTime(float DeltaTime);
+	UFUNCTION()
+	void IncrementFatigue(float DeltaTime);
+	UFUNCTION()
+	void OnRep_Health();
+	FORCEINLINE ETurningInPlace GetTurningInPlace() const { return TurningInPlace; } 
+	FORCEINLINE bool IsElimmed() const { return bElimmed; }
+	class AOriginPlayerController* OriginPlayerController;
+	
+	UFUNCTION()
+	void ReceiveDamage(AActor* DamagedActor, float Damage, const UDamageType* DamageType, class AController* InstigatorController, AActor* DamageCauser);
+	void UpdateHUDHealth();
+	void UpdateHUDFatigue();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+	int32 Ammunition;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+	int32 Magazine;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Combat")
+	bool Canfire;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Fatique")
+	FTimerHandle FatigueTimerHandle;
+
+
+
+
+
 };

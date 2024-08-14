@@ -7,48 +7,87 @@
 #include "Weapon.generated.h"
 
 UENUM(BlueprintType)
-enum class EWeaponState 
+enum class EWeaponState
 {
-EWS_Initial UMETA(DisplayName="Initial Name"),
-EWS_Equpiped UMETA(DisplayName = "Equipped"),
-EWS_Dropped UMETA(DisplayName = " Dropped"),
-
+    EWS_Initial UMETA(DisplayName = "Initial Name"),
+    EWS_Equipped UMETA(DisplayName = "Equipped"),
+    EWS_Dropped UMETA(DisplayName = "Dropped"),
 };
-
 
 UCLASS()
 class PROJECT_TACO_API AWeapon : public AActor
 {
-	GENERATED_BODY()
-	
-public:	
-	// Sets default values for this actor's properties
-	UFUNCTION(BlueprintCallable, Category = "Weapon")
-	FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
-	AWeapon();
-	virtual void Tick(float DeltaTime) override;
-	void Fire();
-	UPROPERTY(EditAnywhere, Category = "Weapon Properties")
+    GENERATED_BODY()
 
-	class UAnimationAsset* FireAnimation;
+public:
+    // Sets default values for this actor's properties
+    AWeapon();
 
-	void SetOwningCharacter(ACharacter* NewOwner); // Method declaration
+    // Called every frame
+    virtual void Tick(float DeltaTime) override;
+
+    // Fire weapon method
+    virtual void Fire(const FVector& HitTarget);
+
+    UFUNCTION()
+    void JamAnimaton();
+
+    // Sets the owning character
+    void SetOwningCharacter(ACharacter* NewOwner);
+
+    // Getter for Weapon Mesh
+    UFUNCTION(BlueprintCallable, Category = "Weapon")
+    FORCEINLINE USkeletalMeshComponent* GetWeaponMesh() const { return WeaponMesh; }
+
 protected:
-	// Called when the game starts or when spawned
-	virtual void BeginPlay() override;
-
+    // Called when the game starts or when spawned
+    virtual void BeginPlay() override;
 
 private:
-	UPROPERTY(VisibleAnywhere, Category="Weapon Properties")
-	USkeletalMeshComponent* WeaponMesh;
+    // Weapon mesh component
+    UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
+    USkeletalMeshComponent* WeaponMesh;
 
-	UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
-	class USphereComponent* AreaSphere;
+    // Collision component for area detection
+    UPROPERTY(VisibleAnywhere, Category = "Weapon Properties")
+    class USphereComponent* AreaSphere;
 
-	UPROPERTY(VisibleAnywhere)
-	EWeaponState WeaponState;
+    // Current weapon state
+    UPROPERTY(VisibleAnywhere)
+    EWeaponState WeaponState;
 
-	UPROPERTY(Replicated)
-	ACharacter* OwningCharacter;
+    // Reference to the owning character
+    UPROPERTY(Replicated)
+    ACharacter* OwningCharacter;
 
+    // Reference to the specific character class (AOriginCharacter)
+    UPROPERTY(BlueprintReadOnly, Category = Character, meta = (AllowPrivateAccess = "true"))
+    class AOriginCharacter* OriginCharacter;
+
+    // Animation assets
+    UPROPERTY(EditAnywhere, Category = "Weapon Properties")
+    UAnimationAsset* FirstJamAnimation;
+
+    UPROPERTY(EditAnywhere, Category = "Weapon Properties")
+    UAnimationAsset* SecondJamAnimation;
+
+    UPROPERTY(EditAnywhere, Category = "Weapon Properties")
+   UAnimationAsset* ThirdJamAnimation;
+
+    UPROPERTY(EditAnywhere, Category = "Weapon Properties")
+    class UAnimationAsset* FireAnimation;
+
+
+    // Casing class for spawning shell casings
+    UPROPERTY(EditAnywhere)
+    TSubclassOf<class ACasing> CasingClass;
+
+    UPROPERTY(VisibleAnywhere, Category = "Jams")
+    bool bFirstJam;
+
+    UPROPERTY(VisibleAnywhere, Category = "Jams")
+    bool bSecondJam;
+
+    UPROPERTY(VisibleAnywhere, Category = "Jams")
+    bool bThirdJam;
 };

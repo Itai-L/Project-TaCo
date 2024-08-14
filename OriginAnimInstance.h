@@ -19,7 +19,7 @@ class PROJECT_TACO_API UOriginAnimInstance : public UAnimInstance
 public:
 	virtual void NativeInitializeAnimation() override;
 	virtual void NativeUpdateAnimation(float DeltaTime) override;
-
+	float CalculateRateScale();
 private:
 	UPROPERTY(BlueprintReadOnly, Category = Character, meta = (AllowPrivateAccess = "true"))
 	class AOriginCharacter* OriginCharacter;
@@ -51,12 +51,25 @@ private:
 	bool bTurnRight;
 	UPROPERTY(BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
 	bool bTurnLeft;
-
 	UPROPERTY(BlueprintReadOnly, Category = Stance, meta = (AllowPrivateAccess = "true"))
 	FTransform LeftHandTransform;
 	UPROPERTY(BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
 	ETurningInPlace TurningInPlace;
-
-	
+	UPROPERTY(BlueprintReadOnly, Category = Movement, meta = (AllowPrivateAccess = "true"))
+	bool bElimmed;
+	UPROPERTY(BlueprintReadOnly, Category = Fatigue, meta = (AllowPrivateAccess = "true"))
+	float RecoveryTime;
+	UPROPERTY(BlueprintReadOnly, Category = Fatigue, meta = (AllowPrivateAccess = "true"))
+	float RateScale;
+	UPROPERTY(BlueprintReadOnly, Category = Jams, meta = (AllowPrivateAccess = "true"))
+	bool bJamsMenu;
+	UPROPERTY(BlueprintReadOnly, Category = Jams, meta = (AllowPrivateAccess = "true"))
+	bool bFirstJam;
+	UPROPERTY(BlueprintReadOnly, Category = Jams, meta = (AllowPrivateAccess = "true"))
+	bool bSecondJam;
+	UPROPERTY(BlueprintReadOnly, Category = Jams, meta = (AllowPrivateAccess = "true"))
+	bool bThirdJam;
+	UPROPERTY(BlueprintReadOnly, Category = Jams, meta = (AllowPrivateAccess = "true"))
+	bool bFirstJamResolve;
 };
 
